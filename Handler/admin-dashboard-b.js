@@ -21,7 +21,7 @@ export const no_Of_Questions = (req, res) => {
 };
 
 export const live_Questions_No = (req, res) => {
-    const sql = 'SELECT COUNT(*) AS Live_Questions FROM Questions';
+    const sql = 'SELECT COUNT(*) AS Live_Questions FROM Questions WHERE status = "Active"';
     db.query(sql, (err, result) => {
         if (err) {
             return res.status(500).json({ Error: "Database Error! Failed to load Live Questions Count" });

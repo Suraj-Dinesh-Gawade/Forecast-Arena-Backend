@@ -137,7 +137,7 @@ export const winOption = (req, res) => {
                                         hasErrors = true;
                                     } else if (isWin) {
                                         // Optional: Insert transaction ledger logs for winning payouts
-                                        const logTxSql = "INSERT INTO transaction (t_user_id, amount, type) VALUES (?, ?, 'Prediction Win Payout')";
+                                        const logTxSql = "INSERT INTO Transactions (t_user_id, amount, type) VALUES (?, ?, 'Prediction Win Payout')";
                                         db.query(logTxSql, [userId, coinsChange], (txErr) => {
                                             if (txErr) console.error("Payout transaction log failed:", txErr);
                                         });
