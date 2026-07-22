@@ -2,9 +2,11 @@ import db from "../Config/db.js";
 
 /**
  * Loads all active questions for the prediction arena.
+ * Filters out questions whose prediction deadlines (End_Time) have passed.
  */
 export const questionData = (req, res) => {
-    const sql = 'SELECT q_id, question, Category, End_Time, Yes_Odds, No_Odds, Odd_One, Odd_Two FROM Questions WHERE LOWER(status) = "active"';
+    // FIXED: Added "AND End_Time > NOW()" to prevent expired questions from loading on the user active dashboard
+    const sql = 'SELECT q_id, question, Category, End_Time, Yes_Odds, No_Odds, Odd_One, Odd_Two FROM Questions WHERE LOWER(status) = "active" AND End_Time > NOW()';
     db.query(sql, (err, result) => {
         if (err) {
             console.error("Database Error (questionData):", err);
@@ -66,8 +68,9 @@ export const addBetsData = (req, res) => {
             });
         }
 
-        // STEP 3: Fetch the question to match the custom options ("YES"/"NO" or Team Names)
-        const getQuestionSql = "SELECT Odd_One, Odd_Two, Green_Amount, Red_Amount FROM Questions WHERE q_id = ?";
+        // STEP 3: Fetch the question to match the custom options ("YES"/"NO" or Team Names) and verify timeline constraints
+        // FIXED: Added End_Time and status selection inside the question validation query
+        const getQuestionSql = "SELECT Odd_One, Odd_Two, Green_Amount, Red_Amount, End_Time, status FROM Questions WHERE q_id = ?";
         db.query(getQuestionSql, [qId], (qErr, qRows) => {
             if (qErr) {
                 console.error("Question fetch error:", qErr);
@@ -79,6 +82,26 @@ export const addBetsData = (req, res) => {
 
             const question = qRows[0];
             const optionOne = question.Odd_One || "YES";
+            
+            // =========================================================================
+            // 🔒 Strict TIME LOCKOUT GATEWAY: Re-evaluates date/time constraints on transaction execution
+            // =========================================================================
+            const deadlineTime = new Date(question.End_Time);
+            const currentServerTime = new Date();
+
+            // Guard A: Verify that the question has not already been settled or resolved by an admin
+            if ((question.status || "active").toLowerCase() !== "active") {
+                return res.status(400).json({ 
+                    Error: "⛔ Prediction Locked! This prediction market is closed or already resolved." 
+                });
+            }
+
+            // Guard B: Confirm current server date-time is strictly before the prediction deadline
+            if (currentServerTime >= deadlineTime) {
+                return res.status(400).json({ 
+                    Error: "⛔ Prediction Locked! The deadline for this market has passed. No more predictions are accepted." 
+                });
+            }
 
             // Dynamically determine the correct odds pool (Green = Option 1, Red = Option 2)
             const isOptionOne = (String(prediction).toLowerCase() === String(optionOne).toLowerCase());
@@ -152,4 +175,4 @@ export const addBetsData = (req, res) => {
             });
         });
     });
-}
+};

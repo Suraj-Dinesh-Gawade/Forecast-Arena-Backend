@@ -1,7 +1,8 @@
 import db from "../Config/db.js";
 
 export const no_Of_Users = (req, res) => {
-    const sql = "SELECT COUNT(*) AS total_Users FROM Users";
+
+    const sql = "SELECT COUNT(*) AS total_Users FROM Users WHERE LOWER(role) = 'user'";
     db.query(sql, (err, result) => {
         if (err) {
             return res.status(500).json({ Error: "Database Error! Failed to Load Users Count" });

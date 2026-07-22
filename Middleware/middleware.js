@@ -10,3 +10,11 @@ export const validateUser = (req, res, next) => {
     };
     next();
 };
+
+export const adminAuth = (req, res, next) => {
+    // 🛡️ Admin Security Guard: Verifies the request header has the required admin role
+    if (req.headers.role !== 'admin') {
+        return res.status(403).json({ Error: "Access Denied: You are not an Admin." });
+    }
+    next();
+};

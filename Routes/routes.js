@@ -2,7 +2,7 @@ import express from "express";
 
 // User APIs
 import { loginUser, registerUser } from "../Handler/validators.js";
-import { validateUser } from "../Middleware/middleware.js";
+import { validateUser, adminAuth } from "../Middleware/middleware.js";
 import { latestQuestion, totalBets, userData } from "../Handler/user-dashboard-b.js";
 import { addBetsData, questionData } from "../Handler/user-questions-b.js";
 import { leaderboardData } from "../Handler/user-leaderboard-b.js";
@@ -31,18 +31,18 @@ routes.get("/LeaderboardData", leaderboardData);
 routes.get("/UserDataProfile/:id", userDataProfile);
 
 // Admin Routes  
-routes.post("/QuestionData", question_Data);
-routes.get("/ManageQuestions", manageQuestion);
-routes.put("/ResolveQuestions/:id", resolveQuestion);
-routes.delete("/DeleteQuestions/:id", deleteQuestion);
-routes.get("/UserData", adminUserData);
-routes.put("/WarnUser/:id", warnUser);
-routes.put("/SuspendUser/:id", suspendUser);
-routes.put("/ActivateUser/:id", activateUser);
-routes.get("/NoOfUsers", no_Of_Users);
-routes.get("/NoOfQuestions", no_Of_Questions);
-routes.get("/NoOfLiveQuestions", live_Questions_No);
-routes.get("/NoOfTotalPredictions", total_Predictions);
-routes.post("/AddWinnerData", winOption);
+routes.post("/QuestionData",adminAuth, question_Data);
+routes.get("/ManageQuestions",adminAuth, manageQuestion);
+routes.put("/ResolveQuestions/:id",adminAuth, resolveQuestion);
+routes.delete("/DeleteQuestions/:id",adminAuth, deleteQuestion);
+routes.get("/UserData",adminAuth, adminUserData);
+routes.put("/WarnUser/:id",adminAuth, warnUser);
+routes.put("/SuspendUser/:id",adminAuth, suspendUser);
+routes.put("/ActivateUser/:id",adminAuth, activateUser);
+routes.get("/NoOfUsers",adminAuth, no_Of_Users);
+routes.get("/NoOfQuestions",adminAuth, no_Of_Questions);
+routes.get("/NoOfLiveQuestions",adminAuth, live_Questions_No);
+routes.get("/NoOfTotalPredictions",adminAuth, total_Predictions);
+routes.post("/AddWinnerData",adminAuth, winOption);
 
 export default routes;
