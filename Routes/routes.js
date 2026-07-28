@@ -1,7 +1,9 @@
 import express from "express";
 
+// register/login APIs
+import { changePassword, loginUser, registerUser, requestPasswordReset } from "../Handler/validators.js";
+
 // User APIs
-import { loginUser, registerUser } from "../Handler/validators.js";
 import { validateUser, adminAuth } from "../Middleware/middleware.js";
 import { latestQuestion, totalBets, userData } from "../Handler/user-dashboard-b.js";
 import { addBetsData, questionData } from "../Handler/user-questions-b.js";
@@ -12,14 +14,20 @@ import { userDataProfile } from "../Handler/user-profile-b.js";
 // Admin APIs
 import { question_Data } from "../Handler/admin-question-b.js";
 import { deleteQuestion, manageQuestion, resolveQuestion, winOption } from "../Handler/admin-manage-questions-b.js";
-import { activateUser, adminUserData, suspendUser, warnUser } from "../Handler/admin-user-b.js";
+import { activateUser, adminUserData, approvePasswordReset, getPasswordRequests, suspendUser, warnUser } from "../Handler/admin-user-b.js";
 import { live_Questions_No, no_Of_Questions, no_Of_Users, total_Predictions } from "../Handler/admin-dashboard-b.js";
 
 const routes = express.Router();
 
-// User Routes
+// register/login Routes
+
 routes.post("/register",validateUser, registerUser);
 routes.post("/login", loginUser);
+routes.post("/request-password-reset", requestPasswordReset);
+routes.put("/change-password", changePassword);
+
+// User Routes
+
 routes.get("/user/:id", userData);
 routes.get("/TotalBets/:id", totalBets);
 // routes.post("/AddQuestions", addQuestion);
@@ -43,6 +51,8 @@ routes.get("/NoOfUsers",adminAuth, no_Of_Users);
 routes.get("/NoOfQuestions",adminAuth, no_Of_Questions);
 routes.get("/NoOfLiveQuestions",adminAuth, live_Questions_No);
 routes.get("/NoOfTotalPredictions",adminAuth, total_Predictions);
-routes.post("/AddWinnerData",adminAuth, winOption);
+routes.post("/AddWinnerData", adminAuth, winOption);
+routes.get("/admin/password-requests", getPasswordRequests);
+routes.post("/admin/approve-reset", approvePasswordReset);
 
 export default routes;

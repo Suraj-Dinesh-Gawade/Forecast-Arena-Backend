@@ -1,5 +1,7 @@
 import db from "../Config/db.js";
 
+const SYSTEM_RESERVED_ID = 1;
+
 export const manageQuestion = (req, res) => {
     const sql = 'SELECT q_id, question, Category, Odd_One, Odd_Two, status  FROM Questions';
     db.query(sql, (err, result) => {
@@ -94,74 +96,67 @@ export const winOption = (req, res) => {
                     let completedQueries = 0;
                     let hasErrors = false;
 
-                    betsList.forEach(bet => {
-                        const betId = bet.bet_id;
-                        const userId = bet.b_user_id;
-                        const betAmount = Number(bet.bet_amount);
-                        
-                        // Check if this specific prediction is a win
-                        const isWin = (bet.selected_option.toLowerCase() === winnervalue.toLowerCase());
-                        
-                        let coinsChange = 0;
-                        let updateBalanceSql = "";
-                        let updateBalanceParams = [];
+                   betsList.forEach(bet => {
+    const betId = bet.bet_id;
+    const userId = bet.b_user_id;
+    const betAmount = Number(bet.bet_amount);
+    const isWin = (bet.selected_option.toLowerCase() === winnervalue.toLowerCase());
 
-                        if (isWin) {
-                            // Winner: Calculate total coin payout (rounded to integer)
-                            coinsChange = Math.round(betAmount * winningOdds);
-                            
-                            // Query to ADD winning coins to the user's account balance
-                            updateBalanceSql = "UPDATE Users SET coins = coins + ? WHERE id = ?";
-                            updateBalanceParams = [coinsChange, userId];
-                        } else {
-                            // Loser: Store the negative value as a loss record (No profile deduction needed as it was paid upfront!)
-                            coinsChange = -betAmount;
-                            
-                            // Query remains a dummy operation that changes nothing (updates user ID with same ID)
-                            updateBalanceSql = "SELECT 1 WHERE ? = ?";
-                            updateBalanceParams = [userId, userId];
-                        }
+    let coinsChange = 0;
+    let updateBalanceSql = "";
+    let updateBalanceParams = [];
 
-                        // Update the dynamic win/loss coin metric in the Bets table
-                        const updateBetCoinsSql = "UPDATE Bets SET Coins_Won_Lose = ? WHERE bet_id = ?";
-                        db.query(updateBetCoinsSql, [coinsChange, betId], (betUpdateErr) => {
-                            if (betUpdateErr) {
-                                console.error(`Failed to update bet coins for Bet ID ${betId}:`, betUpdateErr);
-                                hasErrors = true;
-                                next();
-                            } else {
-                                // Execute user balance adjustments or log audits
-                                db.query(updateBalanceSql, updateBalanceParams, (userUpdateErr) => {
-                                    if (userUpdateErr) {
-                                        console.error(`Failed to adjust coins balance for User ID ${userId}:`, userUpdateErr);
-                                        hasErrors = true;
-                                    } else if (isWin) {
-                                        // Optional: Insert transaction ledger logs for winning payouts
-                                        const logTxSql = "INSERT INTO Transactions (t_user_id, amount, type) VALUES (?, ?, 'Prediction Win Payout')";
-                                        db.query(logTxSql, [userId, coinsChange], (txErr) => {
-                                            if (txErr) console.error("Payout transaction log failed:", txErr);
-                                        });
-                                    }
-                                    next();
-                                });
-                            }
-                        });
+    if (isWin) {
+        coinsChange = Math.round(betAmount * winningOdds);
+        updateBalanceSql = "UPDATE Users SET coins = coins + ? WHERE id = ?";
+        updateBalanceParams = [coinsChange, userId];
+    } else {
+        coinsChange = -betAmount;
+        
+        // 1. Log loss to audit table
+        const logLossSql = "INSERT INTO System_Profit_Audit (user_id, q_id, amount_lost) VALUES (?, ?, ?)";
+        db.query(logLossSql, [userId, qId, betAmount], (auditErr) => {
+            if (auditErr) console.error("Failed to log audit record:", auditErr);
+        });
 
-                        // Synchronizes async database loops so response is only sent when every record is fully saved
-                        function next() {
-                            completedQueries++;
-                            if (completedQueries === betsList.length) {
-                                if (hasErrors) {
-                                    return res.status(200).json({ 
-                                        message: `Winner [${winnervalue}] declared, but some user financial transfers failed.` 
-                                    });
-                                }
-                                res.status(200).json({ 
-                                    message: `Winner [${winnervalue}] registered successfully! Users' prediction cards resolved and coin balances updated.` 
-                                });
-                            }
-                        }
+        // 2. Transfer to System Reserved Account
+        updateBalanceSql = "UPDATE Users SET coins = coins + ? WHERE id = ?";
+        updateBalanceParams = [betAmount, SYSTEM_RESERVED_ID];
+    }
+
+    // Execute updates
+    const updateBetCoinsSql = "UPDATE Bets SET Coins_Won_Lose = ? WHERE bet_id = ?";
+    db.query(updateBetCoinsSql, [coinsChange, betId], (betUpdateErr) => {
+        if (betUpdateErr) {
+            console.error(`Failed to update bet coins for ID ${betId}:`, betUpdateErr);
+            hasErrors = true;
+            next();
+        } else {
+            db.query(updateBalanceSql, updateBalanceParams, (userUpdateErr) => {
+                if (userUpdateErr) {
+                    console.error(`Failed to adjust balance for ID ${userId}:`, userUpdateErr);
+                    hasErrors = true;
+                } else if (isWin) {
+                    const logTxSql = "INSERT INTO Transactions (t_user_id, amount, type) VALUES (?, ?, 'Prediction Win Payout')";
+                    db.query(logTxSql, [userId, coinsChange], (txErr) => {
+                        if (txErr) console.error("Payout transaction log failed:", txErr);
                     });
+                }
+                next();
+            });
+        }
+    });
+
+    function next() {
+        completedQueries++;
+        if (completedQueries === betsList.length) {
+            if (hasErrors) {
+                return res.status(200).json({ message: `Settlement complete, but some transfers failed.` });
+            }
+            res.status(200).json({ message: `Winner [${winnervalue}] registered! Payouts and System Reserved transfers updated.` });
+        }
+    }
+});
                 });    
             //     const { coins, betsUserId } = req.body;
             //     const coinUpdates = 'UPDATE Bets SET Coins_Won_Lose = ? WHERE b_user_id = ?';
@@ -177,3 +172,4 @@ export const winOption = (req, res) => {
         });
     });
 };
+

@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import db from "../Config/db.js";
 
 export const adminUserData = (req, res) => {
@@ -71,5 +72,49 @@ export const activateUser = (req, res) => {
             return res.status(500).json({ Error: "Database Error! Failed to activate user account" });
         };
         res.status(200).json({ message: "User Activated Successfully" });
+    });
+};
+
+// Password-Reset System
+
+// 1. Fetch all pending password reset requests
+export const getPasswordRequests = (req, res) => {
+    const sql = "SELECT * FROM Password_Requests WHERE status = 'Pending' ORDER BY request_date DESC";
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error("Failed to fetch password requests:", err);
+            return res.status(500).json({ Error: "Database Error" });
+        }
+        res.status(200).json(results);
+    });
+};
+
+// 2. Admin approves and resets user password to default "123456"
+export const approvePasswordReset = (req, res) => {
+    const { requestId, username, tempPassword } = req.body;
+
+    if (!tempPassword) {
+        return res.status(400).json({ Error: "Temporary password is required." });
+    }
+
+    bcrypt.hash(tempPassword, 10, (err, hashedPassword) => {
+        if (err) return res.status(500).json({ Error: "Hashing Error" });
+
+        const updatePasswordSql = "UPDATE Users SET password = ? WHERE username = ?";
+        db.query(updatePasswordSql, [hashedPassword, username], (updateErr) => {
+            if (updateErr) {
+                console.error("Failed to update user password:", updateErr);
+                return res.status(500).json({ Error: "Failed to reset password." });
+            }
+
+            const updateRequestSql = "UPDATE Password_Requests SET status = 'Approved' WHERE id = ?";
+            db.query(updateRequestSql, [requestId], (reqErr) => {
+                if (reqErr) console.error("Failed to update request status:", reqErr);
+                
+                res.status(200).json({ 
+                    message: `Password reset successful! Share this temporary password with the user: [ ${tempPassword} ]` 
+                });
+            });
+        });
     });
 };

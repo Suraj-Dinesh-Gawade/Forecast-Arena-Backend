@@ -97,13 +97,12 @@ const sql = `
 export const totalBets = (req, res) => {
     const { id } = req.params;
 
-    // 1. Fetch user data, rank, and betting stats in one consolidated query
     const sql = `
         SELECT u.*, 
         (SELECT COUNT(*) FROM Bets WHERE b_user_id = u.id) AS total_bets,
         (SELECT COUNT(*) FROM Bets WHERE b_user_id = u.id AND LOWER(Win_Lose) IN ('win', 'lose')) AS total_settled,
         (SELECT COUNT(*) FROM Bets WHERE b_user_id = u.id AND LOWER(Win_Lose) = 'win') AS total_wins,
-        (SELECT COUNT(*) + 1 FROM Users u2 WHERE u2.coins > u.coins OR (u2.coins = u.coins AND u2.id < u.id)) AS user_rank
+        (SELECT COUNT(*) + 1 FROM Users u2 WHERE LOWER(u2.role) = 'user' AND (u2.coins > u.coins OR (u2.coins = u.coins AND u2.id < u.id))) AS user_rank
         FROM Users u WHERE u.id = ?
     `;
     
@@ -118,24 +117,31 @@ export const totalBets = (req, res) => {
         const totalSettled = Number(row.total_settled || 0);
         const totalWins = Number(row.total_wins || 0);
         const accuracy = totalSettled > 0 ? Math.round((totalWins / totalSettled) * 100) : 0;
+        const isTopThree = Number(row.user_rank) <= 3;
+        const hasRankedBadge = Boolean(row.has_ranked);
 
-        // 2. Logic to determine new badges
         let updates = [];
         if (accuracy >= 70 && !row.has_sharpshooter) updates.push("has_sharpshooter = TRUE");
         if (row.coins >= 10000 && !row.has_tycoon) updates.push("has_tycoon = TRUE");
-        if (row.user_rank <= 3 && !row.has_ranked) updates.push("has_ranked = TRUE");
         if (totalSettled > 10 && !row.has_loyal) updates.push("has_loyal = TRUE");
+
+        // Sync database rank state in both directions (grant when <=3, remove when >3)
+        if (isTopThree && !hasRankedBadge) {
+            updates.push("has_ranked = TRUE");
+        } else if (!isTopThree && hasRankedBadge) {
+            updates.push("has_ranked = FALSE");
+        }
 
         if (updates.length > 0) {
             const updateSql = `UPDATE Users SET ${updates.join(", ")} WHERE id = ?`;
             db.query(updateSql, [id], (err) => {
                 if(err) console.error("Badge Update Error:", err);
             });
-            // Update flags locally for the response
             updates.forEach(upd => {
                 if(upd.includes("sharpshooter")) row.has_sharpshooter = 1;
                 if(upd.includes("tycoon")) row.has_tycoon = 1;
-                if(upd.includes("ranked")) row.has_ranked = 1;
+                if(upd.includes("has_ranked = TRUE")) row.has_ranked = 1;
+                if(upd.includes("has_ranked = FALSE")) row.has_ranked = 0;
                 if(upd.includes("loyal")) row.has_loyal = 1;
             });
         }
@@ -145,7 +151,7 @@ export const totalBets = (req, res) => {
             badges: {
                 sharpshooter: !!row.has_sharpshooter,
                 tycoon: !!row.has_tycoon,
-                ranked: !!row.has_ranked,
+                ranked: isTopThree,
                 loyal: !!row.has_loyal
             }
         });
