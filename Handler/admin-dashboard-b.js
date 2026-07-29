@@ -40,3 +40,35 @@ export const total_Predictions = (req, res) => {
         res.status(200).json(result[0]);
     });
 };
+
+// Fetch the detailed list for your Audit table view
+export const getAuditLogs = (req, res) => {
+    const sql = `
+        SELECT a.id, u.name as username, q.question, a.amount_lost, a.created_at 
+        FROM System_Profit_Audit a
+        JOIN Users u ON a.user_id = u.id
+        JOIN Questions q ON a.q_id = q.q_id
+        ORDER BY a.created_at DESC
+    `;
+    db.query(sql, (err, result) => {
+        if (err) return res.status(500).json({ Error: "Failed to load audit logs" });
+        res.status(200).json(result);
+    });
+};
+
+// Fetch the TOTAL sum of money lost (Your Total System Profit)
+export const getTotalSystemProfit = (req, res) => {
+    const sql = "SELECT SUM(amount_lost) AS totalProfit FROM System_Profit_Audit";
+    db.query(sql, (err, result) => {
+        if (err) return res.status(500).json({ Error: "Failed to calculate total profit" });
+
+        const sql2 = 'INSERT INTO System_Profit_Audit(Total_System_Coins) VALUES (?)';
+        db.query(sql2, [sql], (err2) => {
+            if (err2) {
+                console.log("Error while storing total coins in the system");
+                return res.status(500).json({ Error: "Database Error! Failed to store total coins in the system" });
+            };
+        });
+        res.status(200).json({ totalProfit: result[0].totalProfit || 0 });
+    });
+};

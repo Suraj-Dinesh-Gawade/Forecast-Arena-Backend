@@ -15,7 +15,7 @@ import { userDataProfile } from "../Handler/user-profile-b.js";
 import { question_Data } from "../Handler/admin-question-b.js";
 import { deleteQuestion, manageQuestion, resolveQuestion, winOption } from "../Handler/admin-manage-questions-b.js";
 import { activateUser, adminUserData, approvePasswordReset, getPasswordRequests, suspendUser, warnUser } from "../Handler/admin-user-b.js";
-import { live_Questions_No, no_Of_Questions, no_Of_Users, total_Predictions } from "../Handler/admin-dashboard-b.js";
+import { getAuditLogs, getTotalSystemProfit, live_Questions_No, no_Of_Questions, no_Of_Users, total_Predictions } from "../Handler/admin-dashboard-b.js";
 
 const routes = express.Router();
 
@@ -54,5 +54,7 @@ routes.get("/NoOfTotalPredictions",adminAuth, total_Predictions);
 routes.post("/AddWinnerData", adminAuth, winOption);
 routes.get("/admin/password-requests", getPasswordRequests);
 routes.post("/admin/approve-reset", approvePasswordReset);
+routes.get("/GetAuditLogs", getAuditLogs);
+routes.get("/GetTotalSystemProfit", getTotalSystemProfit);
 
 export default routes;
