@@ -5,6 +5,9 @@ import db from "../Config/db.js";
  * Filters out questions whose prediction deadlines (End_Time) have passed.
  */
 export const questionData = (req, res) => {
+
+    db.query("UPDATE Questions SET status = 'Settled' WHERE status = 'Active' AND End_Time <= NOW()", (updateErr) => {
+    if (updateErr) console.error("Failed to update expired questions:", updateErr);
     // FIXED: Added "AND End_Time > NOW()" to prevent expired questions from loading on the user active dashboard
     const sql = 'SELECT q_id, question, Category, End_Time, Yes_Odds, No_Odds, Odd_One, Odd_Two FROM Questions WHERE LOWER(status) = "active" AND End_Time > NOW()';
     db.query(sql, (err, result) => {
@@ -21,8 +24,8 @@ export const questionData = (req, res) => {
         }
         res.status(200).json(result);
     });
+    });
 };
-
 /**
  * Places a prediction bet, checks for active suspensions, verifies balances,
  * deducts coins, logs transactional histories, and updates dynamic odds pools!
